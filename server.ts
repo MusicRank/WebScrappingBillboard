@@ -1,48 +1,26 @@
-import express, { Application, Request, Response } from 'express';
-import { executablePath } from 'puppeteer';
-import puppeteer from 'puppeteer-core';
-
-(async () => {
-  const browser = await puppeteer.launch({
-    headless: false,
-    executablePath: executablePath(),
-  });
-  const page = await browser.newPage();
-
-  await page.goto('https://developer.chrome.com/');
-
-  // Set screen size
-  await page.setViewport({width: 1080, height: 1024});
-
-  // Type into search box
-  await page.type('.search-box__input', 'automate beyond recorder');
-
-  // Wait and click on first result
-  const searchResultSelector = '.search-box__link';
-  await page.waitForSelector(searchResultSelector);
-  await page.click(searchResultSelector);
-
-  // Locate the full title with a unique string
-  const textSelector = await page.waitForSelector(
-    'text/Customize and automate'
-  );
-  const fullTitle = await textSelector?.evaluate(el => el.textContent);
-
-  // Print the full title
-  console.log('The title of this blog post is "%s".', fullTitle);
-
-  await browser.close();
-})();
+import express, { Application, Request, Response } from "express";
+import schedule from "node-schedule";
+import { AlbumData, getTopAlbumsFromBillboard } from "./puppeteer";
 
 const app: Application = express();
+const PORT: number = 3000;
 
-const PORT = 3000;
+let albums: AlbumData[] = [];
 
-app.get('/', async (req: Request, res: Response): Promise<Response> => {
-  return res.status(200).send({
-    message: 'Hello World!',
-  });
-});
+app.get(
+  "/api/top-albums",
+  async (req: Request, res: Response): Promise<Response> => {
+    schedule.scheduleJob(
+      "getTopAlbumsFromBillboard",
+      "15 11 * * 2-3",
+      async () => {
+        albums = await getTopAlbumsFromBillboard();
+      }
+    );
+
+    return res.status(200).send(albums);
+  }
+);
 
 try {
   app.listen(PORT, (): void => {
